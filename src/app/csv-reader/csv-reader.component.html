@@ -1,0 +1,17 @@
+<p>csv-reader works!</p>
+<input type="file"
+       (change)="onFileSelect($event)">
+<ng-container *ngIf="csvData$ | async as data">
+    <table>
+        <thead>
+            <tr *ngFor="let header of data.headers">
+                <th>{{header}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr *ngFor="let body of data.body">
+                <th>{{body}}</th>
+            </tr>
+        </tbody>
+    </table>
+</ng-container>
