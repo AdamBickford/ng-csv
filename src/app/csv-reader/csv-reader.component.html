@@ -7,13 +7,13 @@
     <ng-container *ngIf="csvPreview$ | async as data">
         <table>
             <thead>
-                <tr *ngFor="let header of data.headers">
-                    <th>{{header}}</th>
-                </tr>
+                <th *ngFor="let header of data.headers">{{header}}</th>
             </thead>
             <tbody>
                 <tr *ngFor="let body of data.body">
-                    <th>{{body}}</th>
+                    <td *ngFor="let tmp of body">
+                        {{tmp}}
+                    </td>
                 </tr>
             </tbody>
         </table>

@@ -1,4 +1,5 @@
 userName,email,role
+validuser,valid@email.com,user
 foo,,
 validuser,invalid@email,invalidRole
 validuser,valid@email.com,invalidRole

@@ -33,102 +33,56 @@ export class CsvReaderComponent {
   }>>([])
 
   onFileSelect(event: any) {
-    const tmp$ = new BehaviorSubject<ParseStepResult<unknown> | null>(null)
+    this.preview(event);
+    this.validate(event);
+  }
 
-    Papa.parse(event.target.files[0], {
-      delimiter: "",
+  private preview(event: any) {
+    const tmp$ = new BehaviorSubject<ParseStepResult<unknown> | null>(null);
+    Papa.parse<string[]>(event.target.files[0], {
+      header: false,
+      dynamicTyping: true,
+      step: f => tmp$.next(f),
+      complete: () => tmp$.complete()
+    });
+
+    tmp$.pipe(
+      filter(Boolean),
+      take(10),
+      map(it => it.data),
+      toArray(),
+      map(it => ({
+        headers: it[0] as string[],
+        body: it.slice(1, it.length) as string[]
+      })),
+      tap(it => this.csvPreview$.next(it))
+    ).subscribe();
+  }
+
+  private validate(event: any) {
+    const tmp$ = new BehaviorSubject<ParseStepResult<unknown> | null>(null);
+    Papa.parse<string[]>(event.target.files[0], {
       header: true,
       dynamicTyping: true,
       step: f => tmp$.next(f),
       complete: () => tmp$.complete()
-    })
+    });
 
     tmp$.pipe(
-      filter(Boolean),
       map(it => Object.assign(new User(), it?.data)),
       concatMap(it => from(validate(it))),
       map(error => {
         return {
           errorMessages: error.map(it => Object.values(it.constraints || {})),
-          user: JSON.stringify(error[0]!!.target)
-        }
+          user: JSON.stringify(error[0]?.target ? error[0].target : 'No Errors')
+        };
       }),
       toArray(),
       tap(it => this.validationResults$.next(it))
     )
       .subscribe(it => {
         console.log("results:", it);
-      })
-
-    /* from(event.target.files as FileList)
-      .pipe(
-        single(),
-        switchMap(it => makeTextFileLineIterator(it.stream().getReader())),
-        map(String),
-        tap(it => console.log("Hmmm", it)),
-        switchMap(it => combineLatest(
-          // [from(it).pipe(take(1)),
-          // from(it).pipe(skip(1))],
-          [from(it).pipe(take(1), toArray()),
-            from(it).pipe(skip(1), toArray())],
-          (headers, body) => ({
-            headers: headers,
-            body: body
-          })
-        )),
-      )
-      .subscribe(it => {
-        console.log("each row? ", it);
-      })
- */
-
-
-    /* let post = new Post();
-    post.title = '< than 10'; // should not pass
-    post.text = 'this is a great post about hell world'; // should not pass
-    post.rating = 11; // should not pass
-
-    from(validate(post))
-      .pipe(
-        switchMap(errors => from(errors)),
-        tap(errors => console.log("errors ", errors)),
-        map(error => Object.values(error.constraints || {})),
-        toArray()
-      )
-      .subscribe(it => {
-        console.log("final post answer", it);
-      })
-
-
-    let user = new User()
-    user.userName = "anything"
-    user.email = "lolnope@foo.jj"
-    user.role = "user"
-
-    from(validate(user))
-      .pipe(
-        switchMap(errors => from(errors)),
-        tap(errors => console.log("errors ", errors)),
-        map(error => Object.values(error.constraints || {})),
-        toArray()
-      )
-      .subscribe(it => {
-        console.log("final user", it);
-      })
- */
-
-    // from(event.target.files as FileList)
-    //   .pipe(
-    //     single(),
-    //     switchMap(it => makeTextFileLineIterator(it.stream().getReader())),
-    //     take(11),
-    //     toArray(),
-    //     tap(it => this.csvData$.next({
-    //       headers: it.slice(0, 1),
-    //       body: it.slice(1)
-    //     })),
-    //   )
-    //   .subscribe()
+      });
   }
 }
 

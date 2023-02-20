@@ -1,0 +1,10 @@
+table,
+th,
+td {
+    border: 1px black solid;
+    border-spacing: 0;
+}
+
+th {
+    background-color: lightgray;
+}
