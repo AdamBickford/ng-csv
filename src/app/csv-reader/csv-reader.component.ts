@@ -1,15 +1,11 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
-import { BehaviorSubject, Subject, combineLatest, concatMap, filter, from, map, of, single, skip, switchMap, take, tap, toArray } from 'rxjs';
+import { BehaviorSubject, concatMap, filter, from, map, take, tap, toArray } from 'rxjs';
 import { validate } from 'class-validator';
-import { Post, User } from './domain';
-import { ParseSpan } from '@angular/compiler';
+import { User } from './domain';
 import * as Papa from 'papaparse';
 import { ParseStepResult } from 'papaparse';
-
-
-
 
 @Component({
   selector: 'app-csv-reader',
@@ -23,8 +19,8 @@ export class CsvReaderComponent {
   //and get a reference to the actual file/blob vs just metadata about it
   //afaict it's either @ViewChild/AfterViewInit or calling an handler on dom event
   readonly csvPreview$ = new BehaviorSubject({
-    headers: Array<string>(),
-    body: Array<string>()
+    headers: Array<any>(),
+    body: Array<any>()
   })
 
   readonly validationResults$ = new BehaviorSubject<Array<{
@@ -33,35 +29,13 @@ export class CsvReaderComponent {
   }>>([])
 
   onFileSelect(event: any) {
-    this.preview(event);
-    this.validate(event);
+    this.combo(event)
   }
 
-  private preview(event: any) {
-    const tmp$ = new BehaviorSubject<ParseStepResult<unknown> | null>(null);
-    Papa.parse<string[]>(event.target.files[0], {
-      header: false,
-      dynamicTyping: true,
-      step: f => tmp$.next(f),
-      complete: () => tmp$.complete()
-    });
+  private combo(event: any) {
+    const tmp$ = new BehaviorSubject<ParseStepResult<unknown> | null>(null)
 
-    tmp$.pipe(
-      filter(Boolean),
-      take(10),
-      map(it => it.data),
-      toArray(),
-      map(it => ({
-        headers: it[0] as string[],
-        body: it.slice(1, it.length) as string[]
-      })),
-      tap(it => this.csvPreview$.next(it))
-    ).subscribe();
-  }
-
-  private validate(event: any) {
-    const tmp$ = new BehaviorSubject<ParseStepResult<unknown> | null>(null);
-    Papa.parse<string[]>(event.target.files[0], {
+    Papa.parse<unknown>(event.target.files[0], {
       header: true,
       dynamicTyping: true,
       step: f => tmp$.next(f),
@@ -69,20 +43,32 @@ export class CsvReaderComponent {
     });
 
     tmp$.pipe(
-      map(it => Object.assign(new User(), it?.data)),
-      concatMap(it => from(validate(it))),
-      map(error => {
-        return {
-          errorMessages: error.map(it => Object.values(it.constraints || {})),
-          user: JSON.stringify(error[0]?.target ? error[0].target : 'No Errors')
-        };
+      filter(Boolean),
+      take(3),
+      toArray(),
+      map(it => {
+        return ({
+          headers: (it as any)[0].meta.fields,
+          body: it.map(row => Object.values(row.data as any))
+        });
       }),
+      tap(it => {
+        this.csvPreview$.next(it)
+      })
+    ).subscribe()
+
+    tmp$.pipe(
+      map(it => Object.assign(new User(), it?.data)),
+      concatMap(user => from(validate(user)).pipe(
+        map(errors => ({ errors, user }))
+      )),
+      map(tuple => ({
+        errorMessages: tuple.errors.map(it => Object.values(it.constraints || { _: "no errors yo" })),
+        user: JSON.stringify(tuple.user)
+      })),
       toArray(),
       tap(it => this.validationResults$.next(it))
-    )
-      .subscribe(it => {
-        console.log("results:", it);
-      });
+    ).subscribe()
   }
 }
 
