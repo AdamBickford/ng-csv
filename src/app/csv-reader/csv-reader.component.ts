@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
-import { BehaviorSubject, combineLatest, combineLatestAll, concatMap, filter, from, map, take, tap, toArray } from 'rxjs';
+import { BehaviorSubject, combineLatest, combineLatestAll, concatMap, filter, from, map, share, take, tap, toArray } from 'rxjs';
 import { validate } from 'class-validator';
 import { User } from './domain';
 import * as Papa from 'papaparse';
@@ -29,16 +29,15 @@ export class CsvReaderComponent {
   }>>([])
 
   onFileSelect(event: any) {
-    const tmp$ = new BehaviorSubject<ParseStepResult<unknown> | null>(null)
+    const tmp$ = new BehaviorSubject<ParseStepResult<string[]> | null>(null)
+      .pipe(
+        share(),
+      ) as BehaviorSubject<ParseStepResult<string[]> | null>
 
-    .pipe(
-      
-    ) as BehaviorSubject<ParseStepResult<unknown> | null>
-
-    Papa.parse<unknown>(event.target.files[0], {
+    Papa.parse<string[]>(event.target.files[0], {
       header: true,
       dynamicTyping: true,
-      step: f => tmp$.next(f),
+      step: row => tmp$.next(row),
       complete: () => tmp$.complete()
     });
 
@@ -46,11 +45,10 @@ export class CsvReaderComponent {
       filter(Boolean),
       take(10),
       toArray(),
-      map(it => ({
-        headers: (it as any)[0].meta.fields,
-        body: it.map(row => Object.values(row.data as string[]))
-      })),
-      tap(it => this.csvPreview$.next(it))
+      map(chunk => ({
+        headers: (chunk as any)[0].meta.fields,
+        body: chunk.map(row => Object.values(row.data))
+      }))
     )
 
     const _validations$ = tmp$.pipe(
@@ -62,15 +60,14 @@ export class CsvReaderComponent {
         errorMessages: tuple.errors.map(it => Object.values(it.constraints || { _: "no errors yo" })),
         user: JSON.stringify(tuple.user)
       })),
-      toArray(),
-      tap(it => this.validationResults$.next(it))
+      toArray()
     )
 
     combineLatest([_preview$, _validations$], (preview, validations) => {
       this.csvPreview$.next(preview)
       this.validationResults$.next(validations)
     })
-    .subscribe()
+      .subscribe()
   }
 }
 
